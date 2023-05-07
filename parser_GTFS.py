@@ -13,14 +13,41 @@ def parse_stops(network_path, railways: nx.Graph):
     :param railways: The railways graph
     """
 
-    with open(network_path + "/stops.txt", 'r') as file:
+    with open("dataset/frequentation-stations.csv") as file:
+        file.readline()  # Skip header
+        frequentation = {}
+        for line in file:
+            fields = line.split(';')
+            code_UIC = fields[1]
+            travelers_2021 = fields[4]
+            frequentation[code_UIC] = travelers_2021
+
+    with open("dataset/list-stations.csv") as file:
+        file.readline()  # Skip header
+        pos = {}
+        for line in file:
+            fields = line.split(';')
+            code_UIC = fields[0]
+            lat_long = fields[16]
+            lat = lat_long.split(', ')[0]
+            long = lat_long.split(', ')[1]
+            pos[code_UIC] = (lat, long)
+
+    with open(network_path + "/stops.txt", 'r', encoding='utf-8') as file:
         for line in file:
             fields = line.split(',')
             stop_id = fields[0]
             if stop_id.startswith('StopPoint:'):
                 code_UIC = stop_point_to_code_UIC(stop_id)
                 stop_name = fields[1]
+                travelers_2021 = frequentation.get(code_UIC, 1000)
+                stop_pos = pos.get(code_UIC)
+
                 nx.set_node_attributes(railways, {code_UIC: stop_name}, "stop_name")
+                nx.set_node_attributes(railways, {code_UIC: travelers_2021}, "travelers_2021")
+                if stop_pos is not None:
+                    nx.set_node_attributes(railways, {code_UIC: stop_pos[0]}, "lat")
+                    nx.set_node_attributes(railways, {code_UIC: stop_pos[1]}, "long")
 
 
 def parse_railways(dataset_path):
@@ -61,9 +88,10 @@ def parse_railways(dataset_path):
                     arrival = datetime.strptime(arrival_time, '%H:%M:%S')
 
                     delta = arrival - departure
+                    travel_time = int(delta.total_seconds() // 60)
 
                     railways.add_node(code_UIC)
-                    railways.add_edge(code_UIC, previous_stop_id)
+                    railways.add_edge(code_UIC, previous_stop_id, travel_time=travel_time)
 
                 previous_stop_id = code_UIC
                 departure_time = fields[2]
@@ -71,28 +99,3 @@ def parse_railways(dataset_path):
         parse_stops(network_path, railways)
 
     return railways
-
-
-def info(G):
-    print("{:>12s} | '{:s}'".format('Graph', G.name))
-
-    n = G.number_of_nodes()
-    m = G.number_of_edges()
-
-    print("{:>12s} | {:,d} ({:,d})".format('Nodes', n, nx.number_of_isolates(G)))
-    print("{:>12s} | {:,d} ({:,d})".format('Edges', m, nx.number_of_selfloops(G)))
-    print("{:>12s} | {:.2f} ({:,d})".format('Degree', 2 * m / n, max([k for _, k in G.degree()])))
-
-    if isinstance(G, nx.DiGraph):
-        G = nx.MultiGraph(G)
-
-    C = list(nx.connected_components(G))
-
-    print("{:>12s} | {:.1f}% ({:,d})".format('LCC', 100 * max(len(c) for c in C) / n, len(C)))
-
-    if isinstance(G, nx.MultiGraph):
-        G = nx.Graph(G)
-
-    print("{:>12s} | {:.4f}".format('Clustering', nx.average_clustering(G)))
-
-    return G
