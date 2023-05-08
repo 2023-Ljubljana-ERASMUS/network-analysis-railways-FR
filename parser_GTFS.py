@@ -22,17 +22,6 @@ def parse_stops(network_path, railways: nx.Graph):
             travelers_2021 = fields[4]
             frequentation[code_UIC] = travelers_2021
 
-    with open("dataset/list-stations.csv") as file:
-        file.readline()  # Skip header
-        pos = {}
-        for line in file:
-            fields = line.split(';')
-            code_UIC = fields[0]
-            lat_long = fields[16]
-            lat = lat_long.split(', ')[0]
-            long = lat_long.split(', ')[1]
-            pos[code_UIC] = (lat, long)
-
     with open(network_path + "/stops.txt", 'r', encoding='utf-8') as file:
         for line in file:
             fields = line.split(',')
@@ -40,26 +29,28 @@ def parse_stops(network_path, railways: nx.Graph):
             if stop_id.startswith('StopPoint:'):
                 code_UIC = stop_point_to_code_UIC(stop_id)
                 stop_name = fields[1]
+                lat = fields[3]
+                long = fields[4]
                 travelers_2021 = frequentation.get(code_UIC, 1000)
-                stop_pos = pos.get(code_UIC)
 
                 nx.set_node_attributes(railways, {code_UIC: stop_name}, "stop_name")
                 nx.set_node_attributes(railways, {code_UIC: travelers_2021}, "travelers_2021")
-                if stop_pos is not None:
-                    nx.set_node_attributes(railways, {code_UIC: stop_pos[0]}, "lat")
-                    nx.set_node_attributes(railways, {code_UIC: stop_pos[1]}, "long")
+                nx.set_node_attributes(railways, {code_UIC: lat}, "lat")
+                nx.set_node_attributes(railways, {code_UIC: long}, "long")
 
 
-def parse_railways(dataset_path):
+def parse_railways(dataset_path, networks=None):
     """ This function parse GTFS files to a NetworkX graph.
 
     :param dataset_path: The dataset path where GTFS files are stored
+    :param networks:
     :return: The graph of the railways
     """
 
-    railways = nx.Graph(name='railways')
+    if networks is None:
+        networks = ["french_high_speed_network_GTFS", "french_inter_city_network_GTFS", "french_regional_networks_GTFS"]
 
-    networks = ["french_high_speed_network_GTFS", "french_inter_city_network_GTFS", "french_regional_networks_GTFS"]
+    railways = nx.Graph(name='railways')
 
     for network in networks:
         network_path = dataset_path + "/" + network

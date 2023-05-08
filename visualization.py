@@ -14,7 +14,6 @@ def draw_network(network: nx.Graph):
     m.drawcountries(linewidth=0.5)
 
     pos = {}
-    nodes = []
     for node in network.nodes(data=True):
         lat = node[1].get('lat')
         long = node[1].get('long')
