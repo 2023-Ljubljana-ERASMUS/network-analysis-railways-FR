@@ -1,5 +1,9 @@
 # Network analysis: A study of the French railways
 
+## Description
+
+This study was carried out as part of a master's project in the Introduction to Network Analysis course at the University of Ljubljana - Faculty of Computer and Information Science. 
+
 ## Dataset  
 
 Transport data are available according to the **General Transit Feed Specification (GTFS)**  [https://gtfs.org/](https://gtfs.org/)
