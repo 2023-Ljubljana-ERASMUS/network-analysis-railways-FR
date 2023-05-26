@@ -1,9 +1,34 @@
+import random
+from collections import deque
+
 import networkx as nx
 import numpy as np
 import seaborn as sns
 from matplotlib import pyplot as plt
 from parser_GTFS import parse_railways
 from geopy.distance import distance
+
+
+def travel_time(G, i):
+    D = {}
+    Q = deque()
+    D[i] = 0
+    Q.append(i)
+    while Q:
+        i = Q.popleft()
+        for j in G[i]:
+            if j not in D:
+                D[j] = D[i] + G.get_edge_data(i, j)['travel_time']
+                Q.append(j)
+    return [d for d in list(D.values()) if d > 0]
+
+
+def average_travel_time(G, n=1000):
+    D = {}
+    for i in G.nodes() if len(G) <= n else random.sample(G.nodes(), n):
+        D[i] = travel_time(G, i)
+    average = float(np.mean([i for d in list(D.values()) for i in d]))
+    return round(average, 2)
 
 
 def distance_between_stations(railways: nx.Graph, station_a, station_b):
@@ -279,7 +304,10 @@ def new_line_experience():
         a = data_with_high_speed[0][i]
         weighted_travel_time.append(np.average(a, weights=travellers))
 
-    find_best_line_to_build(railways, ["Le Havre", "Nice", "Brest", "Clermont-Ferrand"], stations_by_city, cities, weighted_travel_time)
+    best_lines = find_best_lines_to_build(railways,
+                                          ["Toulouse", "Nice", "Toulon", "Montpellier", "Clermont-Ferrand", "Caen"],
+                                          stations_by_city, cities,
+                                          weighted_travel_time)
 
 
 def build_new_line(railways: nx.Graph, station_a, station_b):
@@ -299,20 +327,23 @@ def build_new_line(railways: nx.Graph, station_a, station_b):
     new_railways.add_edge(station_a, station_b, travel_time=travel_time)
     cost = dist * 25
 
-    return new_railways, dist, cost
+    return new_railways, dist, cost, travel_time
 
 
-def find_best_line_to_build(railways: nx.Graph, from_cities, stations_by_city, cities, initial_weighted_travel_time):
+def find_best_lines_to_build(railways: nx.Graph, from_cities, stations_by_city, cities,
+                             initial_weighted_travel_time):
+
     travellers = travellers_by_city(railways, stations_by_city)
-    new_lines = []
+    output = ""
+    best_lines = []
     for data_source in stations_by_city:
 
         if data_source[1] not in from_cities:
             continue
 
-        best_line = None
+        best_line_output = None
         best_perf = None
-
+        best_line = None
         for data_destination in stations_by_city:
 
             if data_source[1] == data_destination[1]:
@@ -320,7 +351,7 @@ def find_best_line_to_build(railways: nx.Graph, from_cities, stations_by_city, c
 
             for station_source in data_source[0]:
                 for station_destination in data_destination[0]:
-                    new_railways, dist, cost = build_new_line(railways, station_source, station_destination)
+                    new_railways, dist, cost, travel_time = build_new_line(railways, station_source, station_destination)
 
                     data_with_new_line = shortest_travel_time_between_major_stations(new_railways, stations_by_city)
 
@@ -333,19 +364,28 @@ def find_best_line_to_build(railways: nx.Graph, from_cities, stations_by_city, c
                     delta = initial_weighted_travel_time[i] - weighted_travel_time
                     delta_cost = cost / delta
 
-                    line = f"[{data_source[1]}]<->[{data_destination[1]}] - Distance: {round(dist, 2)} km," \
-                           f" Accessibility: {round(weighted_travel_time)} min (-{round(delta)}),"\
-                           f" Cost: {round(cost)} M€ ({round(delta_cost, 2)} M€/min) "
+                    temp_output = f"[{data_source[1]}]<->[{data_destination[1]}] - Distance: {round(dist, 2)} km," \
+                                  f" Accessibility: {round(weighted_travel_time)} min (-{round(delta)}),"\
+                                  f" Cost: {round(cost)} M€ ({round(delta_cost, 2)} M€/min) \n"
 
-                    print(line)
+                    output += temp_output
 
                     if best_perf is None or delta_cost < best_perf:
                         best_perf = delta_cost
-                        best_line = line
+                        best_line_output = temp_output
+                        best_line = (station_source, station_destination, travel_time)
 
-        print("\n-----------------")
-        print("The best line to build is :", best_line)
-        print("-----------------\n")
+        best_lines.append(best_line)
+
+        output += f"\nThe best line to build is : {best_line_output}\n"
+        output += "\n-----------------\n"
+
+        print(output)
+
+    with open("./output/new_line_analysis.txt", "w") as file:
+        file.write(output)
+
+    return best_lines
 
 
 def traffic_law_experience():
@@ -384,11 +424,49 @@ def traffic_law_experience():
                   666035, 629334, 616296, 539666, 530267, 520640, 495379, 485315, 439343, 435279, 422654, 422152,
                   390600, 387382]
 
+    data = []
+    with open("./dataset/flow_between_cities.csv", "r") as file:
+        file.readline()  # Skip header
+        for line in file:
+            fields = line.split(';')
+
+            stationA = fields[0]
+            stationB = fields[1]
+            flow = int(fields[2])
+
+            data.append((stationA, stationB, flow))
+
+    random.shuffle(data)
+
+    # split data
+    split_index = len(data) // 3
+    test_set = data[:split_index]
+    learning_set = data[split_index:]
+
     # Learning phase
-    data = [("Paris", "Bordeaux", 22), ("Paris", "Strasbourg", 16),
-            ("Marseille - Aix-en-Provence", "Lyon", 17)]
 
     k = []
+    for element in learning_set:
+        i1 = urban_units.index(element[0])
+        i2 = urban_units.index(element[1])
+        nb_trains = element[2]
+
+        p1 = population[i1]
+        p2 = population[i2]
+
+        s1 = stations_by_urban_units[i1][0][0]
+        s2 = stations_by_urban_units[i2][0][0]
+
+        dist = distance_between_stations(railways, s1, s2)
+        dist = nx.shortest_path_length(railways, stations_by_urban_units[i1][0][0], stations_by_urban_units[i2][0][0], weight='travel_time')
+        traffic = nb_trains * 365 * 1000
+
+        k.append((traffic * np.power(dist, 2)) / (p1 * p2))
+
+    print(k)
+    k = np.mean(k)
+    print(k)
+
     for element in data:
         i1 = urban_units.index(element[0])
         i2 = urban_units.index(element[1])
@@ -401,36 +479,14 @@ def traffic_law_experience():
         s2 = stations_by_urban_units[i2][0][0]
 
         dist = distance_between_stations(railways, s1, s2)
-        traffic = nb_trains
+        traffic = ((p1 * p2) / np.power(dist, 2.20))
 
-        k.append((traffic * dist) / (p1 * p2))
+        estimated = round(traffic * 0.000001 * 365 * 1000)
+        true = nb_trains * 365 * 1000
 
-    print(k)
-    k = np.mean(k)
-    print(k)
-
-    test_data = [("Paris", "Lyon", 24), ("Lille", "Marseille - Aix-en-Provence", 4), ("Paris", "Nice", 10),
-                 ("Paris", "Montpellier", 9), ("Paris", "Rennes", 18)]
-
-    for element in test_data:
-        i1 = urban_units.index(element[0])
-        i2 = urban_units.index(element[1])
-        nb_trains = element[2]
-
-        p1 = population[i1]
-        p2 = population[i2]
-
-        s1 = stations_by_urban_units[i1][0][0]
-        s2 = stations_by_urban_units[i2][0][0]
-
-        dist = distance_between_stations(railways, s1, s2)
-        traffic = float(k) * ((p1 * p2) / dist)
-
-        print(round(traffic), nb_trains)
+        print(estimated, true, estimated - true)
 
 
 # travel_times_experience()
-# robustness_experience()
 # travel_times_experience_top25()
-# new_line_experience()
-traffic_law_experience()
+new_line_experience()

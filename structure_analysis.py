@@ -5,6 +5,8 @@ import numpy as np
 import seaborn as sns
 import random
 from matplotlib import pyplot as plt
+
+import visualization
 from parser_GTFS import parse_railways
 from geopy.distance import distance
 
@@ -13,7 +15,7 @@ def degree_distribution(G: nx.DiGraph):
     """ This function is used to compute the degree distribution of a given graph
 
     :param G: The given graph
-    :return: degree distribution, in-degree distribution, out-degree distribution
+    :return: degree distribution
     """
     distribution = {}
 
@@ -38,6 +40,32 @@ def degree_distribution(G: nx.DiGraph):
     plt.savefig('output/degree_distribution.svg', format="svg", bbox_inches="tight", pad_inches=0.3)
 
     return d
+
+
+def centrality(G):
+
+    BC = nx.betweenness_centrality(G, weight='travel_time')
+    CC = nx.closeness_centrality(G, distance='travel_time')
+    DC = nx.degree_centrality(G)
+    PR = nx.pagerank(G)
+
+    print("\n Centrality \n")
+
+    tops(G, BC, label="betweenness_centrality")
+    tops(G, CC, label="closeness_centrality")
+    tops(G, DC, label="degree_centrality")
+    tops(G, PR, label="page_rank")
+
+
+def k_core(G):
+
+    core = nx.k_core(G)
+
+    print("\n K-Core \n")
+    for node in core.nodes():
+        print(G.nodes[node])
+
+    visualization.draw_network_core(core)
 
 
 def distance(G, i):
@@ -135,20 +163,18 @@ info(railways)
 score = nx.degree_assortativity_coefficient(railways)
 print("{:>12s} | {:.2f}".format('Assort.', score))
 
-degree_distribution(railways)
+# degree_distribution(railways)
+# centrality(railways)
+k_core(railways)
 
 # High-speed
 railways = parse_railways('dataset', networks=["french_high_speed_network_GTFS"])
 info(railways)
 
-# Inter-city
+# Intercity
 railways = parse_railways('dataset', networks=["french_inter_city_network_GTFS"])
 info(railways)
 
 # Regional
 railways = parse_railways('dataset', networks=["french_regional_networks_GTFS"])
 info(railways)
-
-# tops(railways, nx.closeness_centrality(railways, distance='travel_time'), 'closeness_centrality')
-# tops(railways, nx.betweenness_centrality(railways), 'betweenness_centrality')
-# tops(railways, nx.pagerank(railways, weight='travelers_2021'), 'page_rank')
