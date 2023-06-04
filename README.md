@@ -2,7 +2,7 @@
 
 ## Description
 
-This study was carried out as part of a master's project in the Introduction to Network Analysis course at the University of Ljubljana - Faculty of Computer and Information Science. 
+This study was carried out as part of a master's project in the Introduction to Network Analysis course at the University of Ljubljana - Faculty of Computer and Information Science. The paper about this project is available [here](https://drive.google.com/file/d/104CAySntSj-lf4dg7QzE0kU4dkj3_dMg/view).  
 
 ## Dataset  
 
